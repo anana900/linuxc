@@ -1,0 +1,14 @@
+# Budowanie
+gcc main.c -o dupa && ./dupa
+
+# Uruchomienie
+RPI3
+Raspberian
+Pin 12(32)
+
+# Wiedza
+https://openclipart.org/detail/280972/raspberry-pi-3-gpio-pin-chart-with-pi
+https://blog.lxsang.me/post/id/33
+https://man7.org/linux/man-pages/man2/ioctl.2.html
+http://rosettacode.org/wiki/Keyboard_input/Keypress_check#C
+
