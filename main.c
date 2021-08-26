@@ -7,13 +7,15 @@
 #include <sys/ioctl.h>
 #include <stdint.h>
 #include <stdlib.h>
+/* klik bez enteru http://rosettacode.org/wiki/Keyboard_input/Keypress_check */
+#include <termios.h>
 
-#define PORT_OUT "/dev/gpiochip0"
+#define GPIO_CHIP "/dev/gpiochip0"
 
 int set_gpio(int pin, uint8_t value)
 {
-        int fd, ret;
-        fd = open(PORT_OUT, O_RDONLY);
+        int fd = 0;
+	int ret = 0;
 
         struct gpiohandle_request rq;
         rq.lineoffsets[0] = pin;
@@ -22,9 +24,10 @@ int set_gpio(int pin, uint8_t value)
 
 	struct gpiohandle_data data;
 
+        fd = open(GPIO_CHIP, O_RDONLY);
         if (fd < 0)
         {
-                printf("Error dostep  GPIO %s: %s", PORT_OUT, strerror(errno));
+                printf("Error dostep GPIO %s: %s", GPIO_CHIP, strerror(errno));
                 return(-1);;
         }
 
@@ -34,7 +37,6 @@ int set_gpio(int pin, uint8_t value)
 	if (ret == -1)
 	{
     		printf("Error konfiguracja GPIO : %s", strerror(errno));
-    		close(fd);
     		return(-1);
 	}
 
@@ -45,13 +47,8 @@ int set_gpio(int pin, uint8_t value)
         {
                 printf("Error ustawienie GPIO : %s", strerror(errno));
         }
-	else
-	{
-	//	usleep(2000000);
-	}
 
 	close(rq.fd);
-
 	return(0);
 }
 
@@ -104,14 +101,18 @@ int call_sys(char *command)
         int result;
         result = system(command);
 
-        if(result == 0)
+	if(result == -1)
+	{
+		printf("Error system() : %s", strerror(errno));
+		return(-1);
+	}
+
+	if(result == 0)
         {
-                //printf("sys call return 0\n");
                 return(0);
         }
         else
         {
-                //printf("sys call return 1\n");
                 return(1);
         }
 }
@@ -132,28 +133,28 @@ int interface_up_sys()
 
 int ping_test_sys()
 {
-        const char *target = "8.8.8.8";
-        int result;
-
-        result = system("ping -c1 -w1 8.8.8.8 > /dev/null 2>&1");
+        int result = call_sys("ping -c1 -w1 8.8.8.8 > /dev/null 2>&1");
 
         if(result == 0)
         {
                 printf("internet ok\n");
                 return(1);
         }
-        else
+        else if(result == 1)
         {
                 printf("internet brak\n");
                 return(0);
         }
+
+	return(-1);
 }
 
 int ping_wait_internet(int ile, unsigned int co_ile, int oczekiwany_status_ping)
 {
 	int i = 0;
 	int wynik = oczekiwany_status_ping ? 0 : 1;
-	while(i != ile && (wynik = ping_test_sys()) != oczekiwany_status_ping)
+	while(i != ile &&
+	(wynik = ping_test_sys()) != oczekiwany_status_ping)
 	{
 		usleep(co_ile);
 		i++;
@@ -171,15 +172,17 @@ int main()
 {
 	int pin = 12;
 	char znak = 0;
-	int dongle = 0;
+	int stan_diody_led = 0;
+	int ile_powtorzen = 50;
+	int ile_czasu_us = 500000;
 
 	printf(info);
 
 	if(ping_wait_internet(500, 500000, 1) == 1)
 	{
-		dongle = 1;
+		stan_diody_led = 1;
 	}
-	set_gpio(pin, dongle);
+	set_gpio(pin, stan_diody_led);
 
 
 	while(1)
@@ -192,21 +195,16 @@ int main()
 
 		if(znak != 'q')
 		{
-			if(dongle == 0)
+			if(stan_diody_led == 0 &&
+			interface_up_sys() == 0 &&
+			ping_wait_internet(ile_powtorzen, ile_czasu_us, 1) == 1)
 			{
-				interface_up_sys();
-				if(ping_wait_internet(50, 500000, 1) == 1)
-				{
-					dongle = 1;
-				}
+				stan_diody_led = 1;
 			}
-			else
-			{
-				interface_down_sys();
-                                if(ping_wait_internet(50, 500000, 0) == 0)
-                                {
-					dongle = 0;
-				}
+			else if(interface_down_sys() == 0 &&
+			ping_wait_internet(ile_powtorzen, ile_czasu_us, 0) == 0)
+                        {
+				stan_diody_led = 0;
 			}
 		}
 		else if(znak == 'q')
@@ -216,7 +214,7 @@ int main()
 			return(0);
 		}
 
-		set_gpio(pin, dongle);
+		set_gpio(pin, stan_diody_led);
 	}
 	return(0);
 }
