@@ -9,6 +9,8 @@
 #include <stdlib.h>
 /* klik bez enteru http://rosettacode.org/wiki/Keyboard_input/Keypress_check */
 #include <termios.h>
+#include <sys/select.h>
+#include <sys/time.h>
 
 #define GPIO_CHIP "/dev/gpiochip0"
 
@@ -98,7 +100,7 @@ int get_key()
 
 int call_sys(char *command)
 {
-        int result;
+        int result = -1;
         result = system(command);
 
 	if(result == -1)
@@ -108,13 +110,13 @@ int call_sys(char *command)
 	}
 
 	if(result == 0)
-        {
-                return(0);
-        }
-        else
-        {
-                return(1);
-        }
+	{
+		return(0);
+	}
+	else
+	{
+		return(1);
+	}
 }
 
 int interface_down_sys()
@@ -183,7 +185,6 @@ int main()
 		stan_diody_led = 1;
 	}
 	set_gpio(pin, stan_diody_led);
-
 
 	while(1)
 	{
